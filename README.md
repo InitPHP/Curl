@@ -2,6 +2,8 @@
 
 Curl library to help you make advanced HTTP requests with PHP.
 
+[![Latest Stable Version](http://poser.pugx.org/initphp/curl/v)](https://packagist.org/packages/initphp/curl) [![Total Downloads](http://poser.pugx.org/initphp/curl/downloads)](https://packagist.org/packages/initphp/curl) [![Latest Unstable Version](http://poser.pugx.org/initphp/curl/v/unstable)](https://packagist.org/packages/initphp/curl) [![License](http://poser.pugx.org/initphp/curl/license)](https://packagist.org/packages/initphp/curl) [![PHP Version Require](http://poser.pugx.org/initphp/curl/require/php)](https://packagist.org/packages/initphp/curl)
+
 ## Requirements
 
 - PHP 7.4 or higher
