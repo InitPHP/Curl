@@ -20,7 +20,7 @@ composer require initphp/curl
 
 ```php
 require_once "vendor/autoload.php";
-use \InitPHP\Cur\Curl;
+use \InitPHP\Curl\Curl;
 
 $curl = new Curl();
 
@@ -28,9 +28,49 @@ $curl->init('https:://www.muhammetsafak.com.tr');
 $curl->exec();
 $curl->close();
 
-$content = $curl->response()['body'];
+$content = ($curl->getResponse())['body'];
 $curl->clear();
 echo $content;
+```
+
+This library can be used as HTTP client for your API service. Example:
+
+```php
+require_once "vendor/autoload.php";
+use \InitPHP\Curl\Curl;
+
+$curl = new Curl();
+
+$curl->setMethod('PUT')
+    ->setHeader('Content-Type', 'application/json')
+    ->setBody(json_encode([
+        'username'      => 'admin',
+        'mail'          => 'admin@example.com',
+        'password'      => '123456',
+    ]))
+    ->init('http://api.service.example.com/update/1');
+$curl->exec();
+
+$res = $curl->getResponse();
+$curl->clear();
+
+/**
+ * HTTP Response Version and Status Code
+ * @var string $status
+ */
+$status = $res['status'];
+
+/**
+ * HTTP Response Headers
+ * @var array $headers
+ */
+$headers = $res['headers'];
+
+/**
+ * HTTP Response Body
+ * @var string $body
+ */
+$body = $res['body'];
 ```
 
 ## Methods
@@ -43,67 +83,56 @@ Initializes CURL for a URL.
 public function init(string $url): self
 ```
 
-### `body()`
+### `setHeader()`
+
+Defines a header for the HTTP request.
+
+```php
+public function setHeader(string $name, string $value): self
+```
+
+### `setBody()`
 
 Defines the body of the request.
 
 ```php
-public function body(string $body): self
+public function setBody(string $body): self
 ```
 
-### `clear()`
-
-CURL closes and loads the class properties to their default value.
-
-```php
-public function clear(): self
-```
-
-### `response()`
-
-Returns an array containing the response information.
-
-```php
-public function response(): array
-```
-
-The array to return is as follows.
-
-```
-array(
-    'status'    => 'HTTP/1.1 200 OK',
-    'header'    => 'Transfer-Encoding: chunked',
-    'body'      => '...'
-)
-```
-
-### `method()`
+### `setMethod()`
 
 Defines the request method.
 
 ```php
-public function method(string $method = 'GET'): self
+public function setMethod(string $method = 'GET'): self
 ```
 
 `GET`, `POST`, `PUT`, `HEAD`, `PATCH`, `DELETE` or `OPTIONS`
 
-### `protocol()`
+### `setProtocol()`
 
 Defines the http protocol to use.
 
 ```php
-public function protocol(string $protocol = '1.1'): self
+public function setProtocol(string $protocol = '1.1'): self
 ```
 
 `1.0`, `1.1` or `2.0`
 
+### `setFile()`
 
-### `options()`
+If request contains a file, it reports the file body.
+
+```php
+public function setFile(?string $fileBody): self
+```
+
+### `setOption()`
 
 Defines the value of the specified element from the options array.
 
 ```php
-public function option(string $key, $value): self
+public function setOption(string $key, null|string|int|bool $value): self
 ```
 
 The elements of the array of options are described below.
@@ -114,12 +143,33 @@ The elements of the array of options are described below.
 - `ssl` : Boolean. Defines whether the request will be made over SSL. Its default value is `true`.
 - `proxy` : Defines the proxy to use. Its default value is `null`
 
-### `params()`
+### `setParams()`
 
 Adds parameters.
 
 ```php
-public function params(array $params = []): self
+public function setParams(array $params = []): self
+```
+
+### `getResponse()`
+
+Returns an array containing the response information.
+
+```php
+public function getResponse(): array
+```
+
+The array to return is as follows.
+
+```php
+array(
+    'status'    => 'HTTP/1.1 200 OK',
+    'headers'    => [
+        'Content-Type: application/json',
+        // ...
+    ],
+    'body'      => '...'
+)
 ```
 
 ### `exec()`
@@ -128,6 +178,14 @@ Executes CURL.
 
 ```php
 public function exec(): bool
+```
+
+### `clear()`
+
+CURL closes and loads the class properties to their default value.
+
+```php
+public function clear(): self
 ```
 
 ### `close()`

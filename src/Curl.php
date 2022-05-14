@@ -7,7 +7,7 @@
  * @author     Muhammet ŞAFAK <info@muhammetsafak.com.tr>
  * @copyright  Copyright © 2022 InitPHP
  * @license    http://initphp.github.io/license.txt  MIT
- * @version    0.1
+ * @version    0.2
  * @link       https://www.muhammetsafak.com.tr
  */
 
@@ -20,7 +20,7 @@ use InitPHP\Curl\Exception\CurlException;
 class Curl
 {
 
-    public const VERSION = '0.1';
+    public const VERSION = '0.2';
 
     protected ?string $url = null;
 
@@ -42,13 +42,15 @@ class Curl
 
     protected string $body = '';
 
-    protected static int $bodySeek = 0;
+    protected ?string $file = null;
+
+    protected int $fileSeek = 0;
 
     protected array $params = [];
 
-    protected static array $response = [
+    protected array $response = [
         'status'    => 200,
-        'header'    => '',
+        'headers'    => [],
         'body'      => ''
     ];
 
@@ -86,10 +88,70 @@ class Curl
         return $this;
     }
 
-    public function body(string $body): self
+    public function setHeader(string $name, string $value): self
+    {
+        $this->headers[$name] = $value;
+        return $this;
+    }
+
+    public function setBody(string $body): self
     {
         $this->body = $body;
         return $this;
+    }
+
+    public function setMethod(string $method = 'GET'): self
+    {
+        $method = \strtoupper($method);
+        if(!\in_array($method, ['GET', 'POST', 'HEAD', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'], true)){
+            throw new CurlException('Request method can only be GET, POST, PUT, HEAD, DELETE, PATCH or OPTIONS.');
+        }
+        $this->method = $method;
+        return $this;
+    }
+
+    public function setProtocol(string $protocol = '1.1'): self
+    {
+        if(!\in_array($protocol, ['1.0', '1.1', '2.0'], true)){
+            throw new CurlException('The protocol can only be 1.0, 1.1 or 2.0.');
+        }
+        if($protocol == '2.0' && !\defined('CURL_HTTP_VERSION_2_0')){
+            throw new CurlException('libcurl 7.33 needed for HTTP 2.0 support');
+        }
+        $this->protocol = $protocol;
+        return $this;
+    }
+
+    public function setFile(?string $fileBody): self
+    {
+        $this->file = $fileBody;
+        return $this;
+    }
+
+    /**
+     * Defines the value of the specified element from the options array.
+     *
+     * @param string $key
+     * @param null|string|int|bool $value
+     * @return $this
+     */
+    public function setOption(string $key, $value): self
+    {
+        $this->options[$key] = $value;
+        return $this;
+    }
+
+    public function setParams(array $params = []): self
+    {
+        if(!empty($params)){
+            $this->params = \array_merge($this->params, $params);
+        }
+        return $this;
+    }
+
+    public function getResponse(): array
+    {
+        return $this->response;
     }
 
     public function clear(): self
@@ -108,10 +170,11 @@ class Curl
             'proxy'             => null,
         ];
         $this->body = '';
-        static::$bodySeek = 0;
-        self::$response = [
+        $this->file = null;
+        $this->fileSeek = 0;
+        $this->response = [
             'status'    => 200,
-            'header'    => '',
+            'headers'    => [],
             'body'      => ''
         ];
         $this->params = [];
@@ -119,58 +182,12 @@ class Curl
         return $this;
     }
 
-    public function response(): array
-    {
-        return self::$response;
-    }
-
-    public function method(string $method = 'GET'): self
-    {
-        $method = \strtoupper($method);
-        if(!\in_array($method, ['GET', 'POST', 'HEAD', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'], true)){
-            throw new CurlException('Request method can only be GET, POST, PUT, HEAD, DELETE, PATCH or OPTIONS.');
-        }
-        $this->method = $method;
-        return $this;
-    }
-
-    public function protocol(string $protocol = '1.1'): self
-    {
-        if(!\in_array($protocol, ['1.0', '1.1', '2.0'], true)){
-            throw new CurlException('The protocol can only be 1.0, 1.1 or 2.0.');
-        }
-        if($protocol == '2.0' && !\defined('CURL_HTTP_VERSION_2_0')){
-            throw new CurlException('libcurl 7.33 needed for HTTP 2.0 support');
-        }
-        $this->protocol = $protocol;
-        return $this;
-    }
-
-    /**
-     * Defines the value of the specified element from the options array.
-     *
-     * @param string $key
-     * @param $value
-     * @return $this
-     */
-    public function option(string $key, $value): self
-    {
-        $this->options[$key] = $value;
-        return $this;
-    }
-
-    public function params(array $params = []): self
-    {
-        if(!empty($params)){
-            $this->params = \array_merge($this->params, $params);
-        }
-        return $this;
-    }
 
     /**
      * Executes CURL.
      *
      * @return bool
+     * @throws CurlException
      */
     public function exec(): bool
     {
@@ -190,7 +207,7 @@ class Curl
         $this->setOpt(\CURLOPT_MAXREDIRS, ($canFollow ? ($this->options['max_redirects'] ?? 3) : 0));
         $this->setOpt(\CURLOPT_SSL_VERIFYPEER, (($this->options['ssl'] ?? false) ? 1 : 0));
         $this->setOpt(\CURLOPT_SSL_VERIFYHOST, (($this->options['ssl'] ?? false) ? 2 : 0));
-        if(($timeout = ($this->options['timeout'] && 0)) > 0){
+        if(($timeout = ($this->options['timeout'] ?? 0)) > 0){
             $this->setOpt(\CURLOPT_TIMEOUT, $timeout);
         }
 
@@ -228,27 +245,28 @@ class Curl
             case 'DELETE':
             case 'PATCH':
             case 'OPTIONS':
-                if(!empty($this->body)){
+                if(!empty($this->file)){
                     $options[\CURLOPT_UPLOAD] = true;
-                    $size = \strlen($this->body);
+                    $size = \strlen($this->file);
                     if($size > (1024 * 1024)){
                         $options[\CURLOPT_INFILESIZE] = $size;
-                        $options[\CURLOPT_READFUNCTION] = function ($ch, $fd, $lenght){
-                            return $this->readBody($lenght);
+                        $options[\CURLOPT_READFUNCTION] = function ($ch, $fd, $length){
+                            return $this->readUpload($length);
                         };
-                    }else{
-                        $options[\CURLOPT_POSTFIELDS] = $this->body;
-                    }
-                }else{
-                    if(!empty($this->params)){
-                        $params = [];
-                        foreach ($this->params as $key => $value){
-                            $params[] = $key . '=' . $value;
-                        }
-                        $options[\CURLOPT_POST] = true;
-                        $options[\CURLOPT_POSTFIELDS] = \implode('&', $params);
                     }
                 }
+                if(!empty($this->params)){
+                    $params = [];
+                    foreach ($this->params as $key => $value){
+                        $params[] = $key . '=' . $value;
+                    }
+                    $options[\CURLOPT_POST] = true;
+                    $options[\CURLOPT_POSTFIELDS] = \implode('&', $params);
+                }
+        }
+
+        if(!empty($this->body)){
+            $options[\CURLOPT_POSTFIELDS] = $this->body;
         }
 
         \curl_setopt_array($this->curl, $options);
@@ -257,15 +275,15 @@ class Curl
             $str = \trim($data);
             if($str !== ''){
                 if(\strpos(\strtolower($str), 'http/') === 0){
-                    self::$response['status'] = $str;
+                    $this->response['status'] = $str;
                 }else{
-                    self::$response['header'] = $str;
+                    $this->response['headers'][] = $str;
                 }
             }
             return \strlen($data);
         });
         $this->setOpt(\CURLOPT_WRITEFUNCTION, function ($ch, $data) {
-            self::$response['body'] .= $data;
+            $this->response['body'] .= $data;
             return \strlen($data);
         });
 
@@ -302,9 +320,13 @@ class Curl
      * @param $key
      * @param $value
      * @return $this
+     * @throws CurlException
      */
     public function setOpt($key, $value): self
     {
+        if(!isset($this->curl)){
+            throw new CurlException('The Curl::setOpt() method can be used after the init() method and before the exec() method.');
+        }
         \curl_setopt($this->curl, $key, $value);
         return $this;
     }
@@ -324,10 +346,10 @@ class Curl
         return $reheaders;
     }
 
-    protected function readBody(int $lenght): string
+    protected function readUpload(int $length): string
     {
-        $content = \substr($this->body, static::$bodySeek, $lenght);
-        static::$bodySeek += $lenght;
+        $content = \substr($this->file, $this->fileSeek, $length);
+        $this->fileSeek += $length;
         return $content;
     }
 }
