@@ -2,12 +2,12 @@
 /**
  * Curl.php
  *
- * This file is part of InitPHP.
+ * This file is part of Curl.
  *
  * @author     Muhammet ŞAFAK <info@muhammetsafak.com.tr>
- * @copyright  Copyright © 2022 InitPHP
- * @license    http://initphp.github.io/license.txt  MIT
- * @version    0.3
+ * @copyright  Copyright © 2022 Muhammet ŞAFAK
+ * @license    ./LICENSE  MIT
+ * @version    1.0
  * @link       https://www.muhammetsafak.com.tr
  */
 
@@ -20,47 +20,54 @@ use InitPHP\Curl\Exception\CurlException;
 class Curl
 {
 
-    public const VERSION = '0.3';
+    public const SUPPORTED_HTTP_METHODS = [
+        'GET', 'POST', 'HEAD', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'
+    ];
 
     protected ?string $url = null;
 
-    private string $userInfo = '';
-
-    protected string $method = 'GET';
-
-    protected array $headers = [];
-
-    protected string $protocol = '1.1';
-
-    protected array $options = [
-        'allow_redirects'   => false,
-        'max_redirects'     => 3,
-        'timeout'           => 0,
-        'timeout_ms'        => 0,
-        'ssl'               => true,
-        'proxy'             => null,
-    ];
+    protected ?string $userInfo = null;
 
     protected ?string $userAgent = null;
 
     protected ?string $referer = null;
 
-    protected string $body = '';
+    protected string $method = 'GET';
 
-    protected ?string $file = null;
+    protected array $headers = [];
 
-    protected int $fileSeek = 0;
+    protected string $version = '1.1';
 
-    protected array $params = [];
+    protected array $options = [];
 
-    protected array $response = [];
+    protected ?string $body = null;
 
-    /** @var array */
+    protected array $uploads = [];
+
+    protected array $fields = [];
+
+    protected bool $canFollow = false;
+
+    protected bool $allowRedirects = false;
+
+    protected int $maxRedirects = 3;
+
+    protected int $timeout = 0;
+    protected int $timeoutMS = 0;
+
+    protected array $response = [
+        'status'    => null,
+        'version'   => null,
+        'code'      => null,
+        'body'      => '',
+        'headers'   => []
+    ];
+
     protected array $getInfo = [];
 
     protected ?string $error = null;
 
-    /** @var null|false|resource */
+    /** @var null|resource|false */
     protected $curl = null;
 
     public function __construct()
@@ -68,26 +75,24 @@ class Curl
         if(!\extension_loaded('curl')){
             throw new CurlException('The CURL extension must be installed.');
         }
+        $this->canFollow = (!\ini_get('safe_mode') && !\ini_get('open_basedir'));
     }
 
-    public function __destruct()
+    public function __debugInfo()
     {
-        $this->clear();
+        return [
+            'url'   => $this->url
+        ];
     }
 
-    public function init(string $url): self
+    public function setUrl(string $url): self
     {
         if(\filter_var($url, \FILTER_VALIDATE_URL) === FALSE){
-            throw new CurlException('URL address could not be verified');
-        }
-        $this->close();
-        $this->curl = \curl_init();
-        if($this->curl === FALSE){
-            throw new CurlException('Failed to initialize CURL.');
+            throw new \InvalidArgumentException('URL address could not be verified');
         }
         $this->url = $url;
         $parse = \parse_url($url);
-        $this->userInfo = $parse['user'] ?? '';
+        $this->userInfo = $parse['user'] ?? null;
         return $this;
     }
 
@@ -97,58 +102,38 @@ class Curl
         return $this;
     }
 
-    public function setBody(string $body): self
+    public function setHeaders(array $headers): self
     {
-        $this->body = $body;
+        $this->headers = \array_merge($this->headers, $headers);
         return $this;
     }
 
     public function setMethod(string $method = 'GET'): self
     {
         $method = \strtoupper($method);
-        if(!\in_array($method, ['GET', 'POST', 'HEAD', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'], true)){
-            throw new CurlException('Request method can only be GET, POST, PUT, HEAD, DELETE, PATCH or OPTIONS.');
+        if(\in_array($method, self::SUPPORTED_HTTP_METHODS, true) === FALSE){
+            throw new \InvalidArgumentException(('Request method can only be ' . \implode(', ', self::SUPPORTED_HTTP_METHODS)));
         }
         $this->method = $method;
         return $this;
     }
 
-    public function setProtocol(string $protocol = '1.1'): self
+    public function setBody(string $body): self
     {
-        if(!\in_array($protocol, ['1.0', '1.1', '2.0'], true)){
-            throw new CurlException('The protocol can only be 1.0, 1.1 or 2.0.');
-        }
-        if($protocol == '2.0' && !\defined('CURL_HTTP_VERSION_2_0')){
-            throw new CurlException('libcurl 7.33 needed for HTTP 2.0 support');
-        }
-        $this->protocol = $protocol;
+        $this->body = $body;
         return $this;
     }
 
-    public function setFile(?string $fileBody): self
+    public function setVersion(string $httpVersion = '1.1'): self
     {
-        $this->file = $fileBody;
-        return $this;
-    }
-
-    /**
-     * Defines the value of the specified element from the options array.
-     *
-     * @param string $key
-     * @param null|string|int|bool $value
-     * @return $this
-     */
-    public function setOption(string $key, $value): self
-    {
-        $this->options[$key] = $value;
-        return $this;
-    }
-
-    public function setParams(array $params = []): self
-    {
-        if(!empty($params)){
-            $this->params = \array_merge($this->params, $params);
+        $supported_version = ['1.0', '1.1'];
+        if(\defined('CURL_HTTP_VERSION_2_0')){
+            $supported_version[] = '2.0'; //libcurl v7.33 or higher
         }
+        if(\in_array($httpVersion, $supported_version, true) === FALSE){
+            throw new \InvalidArgumentException(('The protocol can only be ' . \implode(', ', $supported_version)));
+        }
+        $this->version = $httpVersion;
         return $this;
     }
 
@@ -164,30 +149,80 @@ class Curl
         return $this;
     }
 
-    /**
-     * @param string|null $case <p>
-     * "status"     (string)    : If any, response status header line
-     * "headers"    (array)     : Array holding the headers of the response.
-     * "body"       (string)    : Response body
-     * "code"       (int)       : Response status code
-     * "version"    (string)    : Response HTTP version
-     * </p>
-     * @return null|int|string|array
-     */
-    public function getResponse(?string $case = null)
+    public function setAllowRedirect(int $maxRedirect = 3): self
     {
-        if(empty($this->response)){
-            return null;
+        if($maxRedirect < 0){
+            $maxRedirect = 0;
         }
-        if($case === null){
-            return $this->response;
+        if($this->canFollow === FALSE){
+            throw new CurlException('"safe_mode" and "open_basedir" must be disabled in the server configuration to follow cURL redirects.');
         }
-        $case = \strtolower($case);
-        return $this->response[$case] ?? null;
+        $this->allowRedirects = true;
+        $this->maxRedirects = $maxRedirect;
+        return $this;
+    }
+
+    public function setTimeout(int $timeout = 0, bool $isMicrosecond = false): self
+    {
+        if($timeout < 0){
+            $timeout = 0;
+        }
+        if($isMicrosecond){
+            $this->timeoutMS = $timeout;
+        }else{
+            $this->timeout = $timeout;
+        }
+        return $this;
+    }
+
+    public function setField(string $key, string $value): self
+    {
+        $this->fields[$key] = $value;
+        return $this;
+    }
+
+    public function setFields(array $fields) : self
+    {
+        $this->fields = \array_merge($this->fields, $fields);
+        return $this;
+    }
+
+    public function setSSL(int $host = 2, int $verify = 1, ?int $version = null): self
+    {
+        $this->addCurlOption(\CURLOPT_SSL_VERIFYPEER, $verify)
+            ->addCurlOption(\CURLOPT_SSL_VERIFYHOST, $host);
+        if($version !== null){
+            $this->addCurlOption(\CURLOPT_SSLVERSION, $version);
+        }
+        return $this;
+    }
+
+    public function setProxy($proxy): self
+    {
+        $this->addCurlOption(\CURLOPT_PROXY, $proxy);
+        return $this;
+    }
+
+    public function setUpload(string $name, \CURLFile $file): self
+    {
+        $this->uploads[$name] = $file;
+        return $this;
     }
 
     /**
      * @param null|string $key
+     * @return null|mixed
+     */
+    public function getResponse(?string $key = null)
+    {
+        if(empty($this->response)){
+            return null;
+        }
+        return ($key === null) ? $this->response : ($this->response[$key] ?? null);
+    }
+
+    /**
+     * @param string|null $key
      * @return null|mixed
      */
     public function getInfo(?string $key = null)
@@ -206,133 +241,127 @@ class Curl
         return empty($this->error) ? null : $this->error;
     }
 
-    public function clear(): self
+    /**
+     * @param int|string $key
+     * @param mixed $value
+     * @return $this
+     */
+    public function setOpt($key, $value): self
     {
-        $this->close();
-        $this->url = null;
-        $this->userInfo = '';
-        $this->method = 'GET';
-        $this->headers = [];
-        $this->protocol = '1.1';
-        $this->options = [
-            'allow_redirects'   => false,
-            'max_redirects'     => 5,
-            'timeout'           => 0,
-            'timeout_ms'        => 0,
-            'ssl'               => true,
-            'proxy'             => null,
-        ];
-        $this->body = '';
-        $this->file = null;
-        $this->fileSeek = 0;
-        $this->response = [];
-        $this->params = [];
-        $this->getInfo = [];
-        $this->userAgent = null;
-        $this->referer = null;
+        $this->options[$key] = $value;
         return $this;
     }
 
+    public function setOptions(array $options): self
+    {
+        $this->options = \array_merge($this->options, $options);
+        return $this;
+    }
 
-    /**
-     * Executes CURL.
-     *
-     * @return bool
-     * @throws CurlException
-     */
-    public function exec(): bool
+    public function prepare(): self
+    {
+        $this->curlOptionsPrepare();
+        return $this;
+    }
+
+    public function handler(): bool
+    {
+        $this->curl = \curl_init();
+        try {
+            if(!empty($this->options)){
+                \curl_setopt_array($this->curl, $this->options);
+            }
+            $res = \curl_exec($this->curl);
+            $this->getInfo = \curl_getinfo($this->curl);
+            $this->error = \curl_error($this->curl);
+        }catch (\Exception $e) {
+            throw new CurlException($e->getMessage());
+        } finally {
+            \curl_setopt_array($this->curl, [
+                \CURLOPT_HEADERFUNCTION => null,
+                \CURLOPT_READFUNCTION => null,
+                \CURLOPT_WRITEFUNCTION => null,
+                \CURLOPT_PROGRESSFUNCTION => null
+            ]);
+            \curl_reset($this->curl);
+            \curl_close($this->curl);
+        }
+        return $res !== FALSE;
+    }
+
+
+    private function curlOptionsPrepare(): void
     {
         if(\defined('CURLOPT_PROTOCOLS')){
-            $this->setOpt(\CURLOPT_PROTOCOLS, (\CURLPROTO_HTTP | \CURLPROTO_HTTPS));
-            $this->setOpt(\CURLOPT_REDIR_PROTOCOLS, (\CURLPROTO_HTTP | \CURLPROTO_HTTPS));
+            $this->addCurlOption(\CURLOPT_PROTOCOLS, (\CURLPROTO_HTTP | \CURLPROTO_HTTPS))
+                ->addCurlOption(\CURLOPT_REDIR_PROTOCOLS, (\CURLPROTO_HTTP | \CURLPROTO_HTTPS));
         }
-        $this->setOpt(\CURLOPT_HEADER, false);
-        $this->setOpt(\CURLOPT_RETURNTRANSFER, false);
-        $this->setOpt(\CURLOPT_FAILONERROR, false);
+        $this->addCurlOption(\CURLOPT_HEADER, false)
+            ->addCurlOption(\CURLOPT_RETURNTRANSFER, false)
+            ->addCurlOption(\CURLOPT_FAILONERROR, false);
 
-        if(($proxy = $this->options['proxy'] ?? null) !== null){
-            $this->setOpt(\CURLOPT_PROXY, $proxy);
-        }
-        $canFollow = !\ini_get('safe_mode') && !\ini_get('open_basedir') && ($this->options['allow_redirects'] ?? false);
-        $this->setOpt(\CURLOPT_FOLLOWLOCATION, $canFollow);
-        $this->setOpt(\CURLOPT_MAXREDIRS, ($canFollow ? ($this->options['max_redirects'] ?? 3) : 0));
-        $this->setOpt(\CURLOPT_SSL_VERIFYPEER, (($this->options['ssl'] ?? false) ? 1 : 0));
-        $this->setOpt(\CURLOPT_SSL_VERIFYHOST, (($this->options['ssl'] ?? false) ? 2 : 0));
-        if(($timeout = ($this->options['timeout'] ?? 0)) > 0){
-            $this->setOpt(\CURLOPT_TIMEOUT, $timeout);
-        }elseif(($timeout_ms = ($this->options['timeout_ms'] ?? 0)) > 0){
-            $this->setOpt(\CURLOPT_TIMEOUT_MS, $timeout_ms);
+        $canFollow = $this->canFollow && $this->allowRedirects;
+        $this->addCurlOption(\CURLOPT_FOLLOWLOCATION, $canFollow)
+            ->addCurlOption(\CURLOPT_MAXREDIRS, $this->maxRedirects);
+
+        if($this->timeout > 0){
+            $this->addCurlOption(\CURLOPT_TIMEOUT, $this->timeout);
+        }elseif($this->timeoutMS > 0){
+            $this->addCurlOption(\CURLOPT_TIMEOUT_MS, $this->timeoutMS);
         }
 
-        $options = [
-            \CURLOPT_CUSTOMREQUEST  => $this->method,
-            \CURLOPT_URL            => $this->url,
-            \CURLOPT_HTTPHEADER     => $this->getHeaders(),
-        ];
+        $this->addCurlOption(\CURLOPT_CUSTOMREQUEST, $this->method)
+            ->addCurlOption(\CURLOPT_URL, $this->url)
+            ->addCurlOption(\CURLOPT_HTTPHEADER, $this->getRequestHeaders());
         if(!empty($this->userAgent)){
-            $options[\CURLOPT_USERAGENT] = $this->userAgent;
+            $this->addCurlOption(\CURLOPT_USERAGENT, $this->userAgent);
         }
         if(!empty($this->referer)){
-            $options[\CURLOPT_REFERER] = $this->referer;
+            $this->addCurlOption(\CURLOPT_REFERER, $this->referer);
         }
 
-        switch($this->protocol){
+        switch ($this->version) {
             case '1.0':
-                $options[\CURLOPT_HTTP_VERSION] = \CURL_HTTP_VERSION_1_0;
+                $version = \CURL_HTTP_VERSION_1_0;
                 break;
             case '1.1':
-                $options[\CURLOPT_HTTP_VERSION] = \CURL_HTTP_VERSION_1_1;
+                $version = \CURL_HTTP_VERSION_1_1;
                 break;
             case '2.0':
-                $options[\CURLOPT_HTTP_VERSION] = \CURL_HTTP_VERSION_2_0;
+                $version = \CURL_HTTP_VERSION_2_0;
                 break;
+            default:
+                $version = \CURL_HTTP_VERSION_1_1;
         }
+        $this->addCurlOption(\CURLOPT_HTTP_VERSION, $version);
 
         if(!empty($this->userInfo)){
-            $options[\CURLOPT_USERPWD] = $this->userInfo;
+            $this->addCurlOption(\CURLOPT_USERPWD, $this->userInfo);
         }
 
-        switch ($this->method){
+        switch ($this->method) {
             case 'HEAD':
-                $options[\CURLOPT_NOBODY] = true;
+                $this->addCurlOption(\CURLOPT_NOBODY, true);
                 break;
             case 'GET':
-                $options[\CURLOPT_HTTPGET] = true;
+                $this->addCurlOption(\CURLOPT_HTTPGET, true);
                 break;
-            case 'POST':
-            case 'PUT':
-            case 'DELETE':
-            case 'PATCH':
-            case 'OPTIONS':
-                if(!empty($this->file)){
-                    $options[\CURLOPT_UPLOAD] = true;
-                    $size = \strlen($this->file);
-                    if($size > (1024 * 1024)){
-                        $options[\CURLOPT_INFILESIZE] = $size;
-                        $options[\CURLOPT_READFUNCTION] = function ($ch, $fd, $length){
-                            return $this->readUpload($length);
-                        };
-                    }
-                }
-                if(!empty($this->params)){
-                    $params = [];
-                    foreach ($this->params as $key => $value){
-                        $params[] = $key . '=' . $value;
-                    }
-                    $options[\CURLOPT_POST] = true;
-                    $options[\CURLOPT_POSTFIELDS] = \implode('&', $params);
-                }
+        }
+        if(!empty($this->uploads)){
+            $this->fields = \array_merge($this->fields, $this->uploads);
+        }
+        if(!empty($this->fields)){
+            $this->addCurlOption(\CURLOPT_POST, true)
+                ->addCurlOption(\CURLOPT_POSTFIELDS, $this->fields);
         }
 
         if(!empty($this->body)){
-            $options[\CURLOPT_POSTFIELDS] = $this->body;
+            $this->addCurlOption(\CURLOPT_POSTFIELDS, $this->body);
         }
 
-        \curl_setopt_array($this->curl, $options);
-
-        $this->setOpt(\CURLOPT_HEADERFUNCTION, function ($ch, $data){
+        $this->addCurlOption(\CURLOPT_HEADERFUNCTION, function ($ch, $data) {
             $str = \trim($data);
-            if($str !== ''){
+            if(!empty($str)){
                 $lowercase = \strtolower($str);
                 if(\strpos($lowercase, 'http/') === 0){
                     $this->response['status'] = $str;
@@ -346,57 +375,27 @@ class Curl
             }
             return \strlen($data);
         });
-        $this->response['body'] = '';
-        $this->setOpt(\CURLOPT_WRITEFUNCTION, function ($ch, $data) {
+
+        $this->addCurlOption(\CURLOPT_WRITEFUNCTION, function ($ch, $data) {
             $this->response['body'] .= $data;
             return \strlen($data);
         });
 
-        try {
-            $exec = \curl_exec($this->curl);
-            $this->getInfo = \curl_getinfo($this->curl);
-            $this->error = \curl_error($this->curl);
-        } finally {
-            $this->setOpt(\CURLOPT_HEADERFUNCTION, null)
-                ->setOpt(\CURLOPT_READFUNCTION, null)
-                ->setOpt(\CURLOPT_WRITEFUNCTION, null)
-                ->setOpt(\CURLOPT_PROGRESSFUNCTION, null)
-                ->setOpt(\CURLOPT_PROGRESSFUNCTION, null);
-            \curl_reset($this->curl);
-        }
-        return $exec !== FALSE;
     }
 
-    /**
-     * Closes the current CURL.
-     */
-    public function close(): void
+    private function addCurlOption($key, $value): self
     {
-        if($this->curl !== null){
-            \curl_close($this->curl);
+        if(!isset($this->options[$key])){
+            $this->options[$key] = $value;
         }
-        $this->curl = null;
-    }
-
-    /**
-     * Defines an options with the `curl_setopt()` function for the current CURL.
-     *
-     * @param $key
-     * @param $value
-     * @return $this
-     * @throws CurlException
-     */
-    public function setOpt($key, $value): self
-    {
-        if(!isset($this->curl)){
-            throw new CurlException('The Curl::setOpt() method can be used after the Curl::init() method and before the Curl::exec() method.');
-        }
-        \curl_setopt($this->curl, $key, $value);
         return $this;
     }
 
-    protected function getHeaders(): array
+    private function getRequestHeaders(): array
     {
+        if(empty($this->headers)){
+            return [];
+        }
         $headers = [];
         foreach ($this->headers as $key => $values){
             if(!\is_array($values)){
@@ -410,10 +409,5 @@ class Curl
         return $headers;
     }
 
-    protected function readUpload(int $length): string
-    {
-        $content = \substr($this->file, $this->fileSeek, $length);
-        $this->fileSeek += $length;
-        return $content;
-    }
+
 }

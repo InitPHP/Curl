@@ -22,14 +22,16 @@ require_once "vendor/autoload.php";
 use \InitPHP\Curl\Curl;
 
 $curl = new Curl();
+$curl->setUrl("https://example.com");
+$curl->prepare()
+    ->handler();
+    
+$res = $this->getResponse();
 
-$curl->init('https:://www.muhammetsafak.com.tr');
-$curl->exec();
-$curl->close();
-
-$content = ($curl->getResponse('body'));
-$curl->clear();
-echo $content;
+if(!empty($curl->getError())){
+    die($curl->getError());
+}
+echo $res['body'];
 ```
 
 This library can be used as HTTP client for your API service. Example:
@@ -40,262 +42,273 @@ use \InitPHP\Curl\Curl;
 
 $curl = new Curl();
 
-$curl->setMethod('PUT')
-    ->setHeader('Content-Type', 'application/json')
+$curl->setUrl("http://api.service.example.com/update/1")
+    ->setMethod("PUT") // HTTP Request METHOD
+    ->setVersion("1.1") // HTTP Version
+    ->setHeader("Content-Type", "application/json")
     ->setBody(json_encode([
-        'username'      => 'admin',
-        'mail'          => 'admin@example.com',
-        'password'      => '123456',
+        'username'  => 'admin',
+        'password'  => '12345',
     ]))
-    ->init('http://api.service.example.com/update/1');
-$curl->exec();
+    ->prepare()
+    ->handler();
 
-$res = $curl->getResponse();
-$curl->clear();
+if(!empty($curl->getError())){
+    die($curl->getError());
+}
 
-/**
- * HTTP Response Version and Status Code
- * @var string $status
- */
-$status = $res['status'];
-
-/**
- * Response HTTP Status Code
- * @var int $code
- */
-$code = $res['code'];
-
-/**
- * Response HTTP Version Status
- * @var string $version
- */
-$version = $res['version'];
-
-/**
- * HTTP Response Headers
- * @var array $headers
- */
-$headers = $res['headers'];
-
-/**
- * HTTP Response Body
- * @var string $body
- */
-$body = $res['body'];
+switch ($curl->getResponse('code')) {
+    case 200 :
+    case 201 :
+        // Success
+        break;
+    case 404 :
+        // Not Found
+        break;
+    case 400:
+        // Badrequest
+        break;
+    // ...
+}
 ```
 
 ## Methods
 
-### `init()`
+### `getResponse()`
 
-Initializes CURL for a URL.
+Returns the result of the curl operation.
 
 ```php
-public function init(string $url): self
+public function getResponse(null|string $key = null): null|mixed;
 ```
+
+The values that can be used for the `$key` parameter and its explanation are explained below.
+
+- `NULL` : Returns an associative array containing all response information.
+- `"status"` : Returns the status header information line of the HTTP response.
+- `"code"` : Returns the HTTP response code.
+- `"version"` : Returns HTTP response version information.
+- `"headers"` : Returns the headers of the HTTP response as an array.
+- `"body"` : Returns the body of the HTTP response.
+
+### `setUrl()`
+
+Defines URL information for cURL.
+
+```php
+public function setUrl(string $url): self
+```
+
+Throws `\InvalidArgumentException` if it is not a valid URL.
 
 ### `setHeader()`
 
-Defines a header for the HTTP request.
+Adds a header for the request.
 
 ```php
 public function setHeader(string $name, string $value): self
 ```
 
-### `setBody()`
-
-Defines the body of the request.
+**Example :**
 
 ```php
-public function setBody(string $body): self
+/** @var \InitPHP\Curl\Curl $curl */
+$curl->setHeader('Content-type', 'application/json; charset=utf8');
+```
+
+### `setHeaders()`
+
+For the request; Adds one or more headers via an associative array.
+
+```php
+public function setHeaders(array $headers): self
+```
+
+**Example :**
+
+```php
+/** @var \InitPHP\Curl\Curl $curl */
+$curl->setHeaders([
+    'Content-type' => 'application/json; charset=utf8'
+]);
 ```
 
 ### `setMethod()`
 
-Defines the request method.
+Defines the HTTP Request method.
 
 ```php
 public function setMethod(string $method = 'GET'): self
 ```
 
-`GET`, `POST`, `PUT`, `HEAD`, `PATCH`, `DELETE` or `OPTIONS`
+The `$method` parameter can take the following values;
 
-### `setProtocol()`
+- GET, POST, PUT, HEAD, DELETE, PATCH, OPTIONS
 
-Defines the http protocol to use.
+### `setBody()`
 
-```php
-public function setProtocol(string $protocol = '1.1'): self
-```
-
-`1.0`, `1.1` or `2.0`
-
-### `setFile()`
-
-If request contains a file, it reports the file body.
+HTTP Request is used to manually define the content information. 
 
 ```php
-public function setFile(?string $fileBody): self
+public function setBody(string $body): self
 ```
 
-### `setOption()`
+### `setVersion()`
 
-Defines the value of the specified element from the options array.
+Defines the HTTP version of the HTTP request.
 
 ```php
-public function setOption(string $key, null|string|int|bool $value): self
+public function setVersion(string $httpVersion = '1.1'): self
 ```
 
-The elements of the array of options are described below.
+The `$httpVersion` parameter can take the following values;
 
-- `allow_redirects` : Boolean. If the destination URL is redirecting; Defines whether the redirect is to be followed. Its default value is `false`.
-- `max_redirects` : Integer. If URL redirects are to be followed, it defines the maximum number of redirects to follow. Its default value is `3`.
-- `timeout` : Integer. Maximum seconds to wait for URL to respond. A number of 0 or less means there is no limit. Its default value is `0`.
-- `timeout_ms` : Integer. Maximum microseconds to wait for URL to respond. A number of 0 or less means there is no limit. Its default value is `0`. It is not used if it is defined in seconds with "`timeout`".
-- `ssl` : Boolean. Defines whether the request will be made over SSL. Its default value is `true`.
-- `proxy` : Defines the proxy to use. Its default value is `null`
-
-### `setParams()`
-
-Adds parameters.
-
-```php
-public function setParams(array $params = []): self
-```
+- `1.0`
+- `1.1`
+- `2.0` (libcurl v7.33 or higher version is required)
 
 ### `setUserAgent()`
 
-Defines the `\CURLOPT_USERAGENT` information for curl.
+Defines the User Agent information to be reported to the server in the cURL process.
 
 ```php
-public function setUserAgent(null|string $userAgent = null): self;
+public function setUserAgent(null|string $userAgent = null): self
+```
+
+**Example :**
+
+```php
+/** @var \InitPHP\Curl\Curl $curl */
+$curl->setUserAgent("Mozilla/5.0 (Windows NT 6.1; Win64; x64; rv:47.0) Gecko/20100101 Firefox/47.0");
 ```
 
 ### `setReferer()`
 
-Defines the `\CURLOPT_REFERER` information for curl.
+Defines HTTP referer information to be reported to the server.
 
 ```php
-public function setReferer(null|string $referer = null): self;
+public function setReferer(null|string $referer = null): self
 ```
 
-### `getResponse()`
+### `setAllowRedirect()`
 
-Returns an array containing the response information.
+Defines whether requests follow redirects. If this method is not used, the redirects are not followed.
 
 ```php
-public function getResponse(null|string $case = null): null|array|string|int
+public function setAllowRedirect(int $maxRedirect = 3): self
 ```
 
-The array to return is as follows. The following array keys can be used for the `$case` parameter.
+### `setTimeout()`
+
+Defines the wait limit for the request in seconds or milliseconds.
 
 ```php
-array(
-    'status'    => 'HTTP/1.1 200 OK',
-    'code'      => 200,
-    'version'   => '1.1',
-    'headers'    => [
-        'Content-Type: application/json',
-        // ...
-    ],
-    'body'      => '...'
-)
+public function setTimeout(int $timeout = 0, bool $isMicrosecond = false): self
+```
+
+If `$isMicrosecond` is FALSE, the value is used as seconds.
+
+### `setField()`
+
+Defines a data to be sent as POST.
+
+```php
+public function setField(string $key, string $value): self
+```
+
+### `setFields()`
+
+It defines the data to be sent by POST with an associative array.
+
+```php
+public function setFields(array $fields) : self
+```
+
+### `setSSL()`
+
+Defines the SSL configurations of the cURL request.
+
+```php
+public function setSSL(int $host = 2, int $verify = 1, null|int $version = null): self
+```
+
+### `setProxy()`
+
+Defines the proxy to be used by cURL.
+
+```php
+public function setProxy($proxy): self
+```
+
+### `setUpload()`
+
+It sends a file to be uploaded to the server.
+
+```php
+public function setUpload(string $name, \CURLFile $file): self
+```
+
+**Example (Single):**
+
+```php
+/** @var \InitPHP\Curl\Curl $curl */
+$curl->setUpload("upload_file", new \CURLFile(__DIR__ . 'image.jpg')); // $_FILES["upload_file"]
+```
+
+**Example (Multi):**
+
+```php
+/** @var \InitPHP\Curl\Curl $curl */
+$curl->setUpload("upload_file[0]", new \CURLFile(__DIR__ . 'image-1.jpg'));
+$curl->setUpload("upload_file[1]", new \CURLFile(__DIR__ . 'image-2.jpg'));
 ```
 
 ### `getInfo()`
 
-It is used to get the value or values returned from the `curl_getinfo()` function.
+It is the `curl_getinfo()` function in this library.
 
 ```php
-public function getInfo(null|string $key = null): null|array|string|int|float;
-```
-
-The array to return is as follows. The following array keys can be used for the `$key` parameter.
-
-```php
-Array
-(
-    [url] => https://example.com
-    [content_type] => text/html; charset=utf-8
-    [http_code] => 200
-    [header_size] => 417
-    [request_size] => 74
-    [filetime] => -1
-    [ssl_verify_result] => 0
-    [redirect_count] => 0
-    [total_time] => 0.572835
-    [namelookup_time] => 0.0598
-    [connect_time] => 0.116755
-    [pretransfer_time] => 0.357189
-    [size_upload] => 0
-    [size_download] => 650
-    [speed_download] => 1134
-    [speed_upload] => 0
-    [download_content_length] => -1
-    [upload_content_length] => 0
-    [starttransfer_time] => 0.572509
-    [redirect_time] => 0
-    [redirect_url] => 
-    [primary_ip] => 192.0.78.24
-    [certinfo] => Array
-        (
-        )
-
-    [primary_port] => 443
-    [local_ip] => 192.168.8.134
-    [local_port] => 53807
-    [http_version] => 2
-    [protocol] => 2
-    [ssl_verifyresult] => 0
-    [scheme] => HTTPS
-    [appconnect_time_us] => 357122
-    [connect_time_us] => 116755
-    [namelookup_time_us] => 59800
-    [pretransfer_time_us] => 357189
-    [redirect_time_us] => 0
-    [starttransfer_time_us] => 572509
-    [total_time_us] => 572835
-)
+public function getInfo(null|string $key = null): null|mixed
 ```
 
 ### `getError()`
 
-if cURL encounters an error; gives the error.
+It is the `curl_error()` function in this library.
 
 ```php
-public function getError(): null|string;
-```
-
-### `exec()`
-
-Executes CURL.
-
-```php
-public function exec(): bool
-```
-
-### `clear()`
-
-CURL closes and loads the class properties to their default value.
-
-```php
-public function clear(): self
-```
-
-### `close()`
-
-Closes the current CURL.
-
-```php
-public function close(): void
+public function getError(): null|string
 ```
 
 ### `setOpt()`
 
-Defines an options with the `curl_setopt()` function for the current CURL.
+It is the `curl_setopt()` function in this library.
 
 ```php
 public function setOpt($key, $value): self
+```
+
+### `setOptions()`
+
+It is the `curl_setopt_array()` function in this library.
+
+```php
+public function setOptions(array $options): self
+```
+
+### `prepare()`
+
+cURL prepares the library for initialization.
+
+```php
+public function prepare(): self
+```
+
+### `handler()`
+
+cURL starts and executes.
+
+```php
+public function handler(): bool
 ```
 
 ## Credits
