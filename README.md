@@ -185,6 +185,70 @@ array(
 )
 ```
 
+### `getInfo()`
+
+It is used to get the value or values returned from the `curl_getinfo()` function.
+
+```php
+public function getInfo(null|string $key = null): null|array|string|int|float;
+```
+
+The array to return is as follows. The following array keys can be used for the `$key` parameter.
+
+```php
+Array
+(
+    [url] => https://example.com
+    [content_type] => text/html; charset=utf-8
+    [http_code] => 200
+    [header_size] => 417
+    [request_size] => 74
+    [filetime] => -1
+    [ssl_verify_result] => 0
+    [redirect_count] => 0
+    [total_time] => 0.572835
+    [namelookup_time] => 0.0598
+    [connect_time] => 0.116755
+    [pretransfer_time] => 0.357189
+    [size_upload] => 0
+    [size_download] => 650
+    [speed_download] => 1134
+    [speed_upload] => 0
+    [download_content_length] => -1
+    [upload_content_length] => 0
+    [starttransfer_time] => 0.572509
+    [redirect_time] => 0
+    [redirect_url] => 
+    [primary_ip] => 192.0.78.24
+    [certinfo] => Array
+        (
+        )
+
+    [primary_port] => 443
+    [local_ip] => 192.168.8.134
+    [local_port] => 53807
+    [http_version] => 2
+    [protocol] => 2
+    [ssl_verifyresult] => 0
+    [scheme] => HTTPS
+    [appconnect_time_us] => 357122
+    [connect_time_us] => 116755
+    [namelookup_time_us] => 59800
+    [pretransfer_time_us] => 357189
+    [redirect_time_us] => 0
+    [starttransfer_time_us] => 572509
+    [total_time_us] => 572835
+)
+```
+
+### `getError()`
+
+if cURL encounters an error; gives the error.
+
+```php
+public function getError(): null|string;
+```
+
 ### `exec()`
 
 Executes CURL.

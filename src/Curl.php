@@ -53,6 +53,8 @@ class Curl
     /** @var array */
     protected array $getInfo = [];
 
+    protected ?string $error = null;
+
     /** @var null|false|resource */
     protected $curl = null;
 
@@ -180,6 +182,11 @@ class Curl
             return $this->getInfo;
         }
         return $this->getInfo[$key] ?? null;
+    }
+
+    public function getError(): ?string
+    {
+        return empty($this->error) ? null : $this->error;
     }
 
     public function clear(): self
@@ -311,6 +318,7 @@ class Curl
             }
             return \strlen($data);
         });
+        $this->response['body'] = '';
         $this->setOpt(\CURLOPT_WRITEFUNCTION, function ($ch, $data) {
             $this->response['body'] .= $data;
             return \strlen($data);
@@ -319,6 +327,7 @@ class Curl
         try {
             $exec = \curl_exec($this->curl);
             $this->getInfo = \curl_getinfo($this->curl);
+            $this->error = \curl_error($this->curl);
         } finally {
             $this->setOpt(\CURLOPT_HEADERFUNCTION, null)
                 ->setOpt(\CURLOPT_READFUNCTION, null)
