@@ -50,8 +50,8 @@ class Curl
 
     protected array $response = [];
 
-    /** @var mixed */
-    protected $info = null;
+    /** @var array */
+    protected array $getInfo = [];
 
     /** @var null|false|resource */
     protected $curl = null;
@@ -167,6 +167,21 @@ class Curl
         return $this->response[$case] ?? null;
     }
 
+    /**
+     * @param null|string $key
+     * @return null|mixed
+     */
+    public function getInfo(?string $key = null)
+    {
+        if(empty($this->getInfo)){
+            return null;
+        }
+        if($key === null){
+            return $this->getInfo;
+        }
+        return $this->getInfo[$key] ?? null;
+    }
+
     public function clear(): self
     {
         $this->close();
@@ -187,7 +202,7 @@ class Curl
         $this->fileSeek = 0;
         $this->response = [];
         $this->params = [];
-        $this->info = null;
+        $this->getInfo = [];
         return $this;
     }
 
@@ -301,11 +316,9 @@ class Curl
             return \strlen($data);
         });
 
-
         try {
             $exec = \curl_exec($this->curl);
-            $this->info = \json_encode(\curl_getinfo($this->curl));
-
+            $this->getInfo = \curl_getinfo($this->curl);
         } finally {
             $this->setOpt(\CURLOPT_HEADERFUNCTION, null)
                 ->setOpt(\CURLOPT_READFUNCTION, null)

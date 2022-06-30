@@ -8,7 +8,6 @@ Curl library to help you make advanced HTTP requests with PHP.
 
 - PHP 7.4 or higher
 - PHP Curl Extension
-- PHP JSON Extension
 
 ## Installation
 
