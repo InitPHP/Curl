@@ -7,7 +7,7 @@
  * @author     Muhammet ŞAFAK <info@muhammetsafak.com.tr>
  * @copyright  Copyright © 2022 InitPHP
  * @license    http://initphp.github.io/license.txt  MIT
- * @version    0.2
+ * @version    0.3
  * @link       https://www.muhammetsafak.com.tr
  */
 
@@ -20,7 +20,7 @@ use InitPHP\Curl\Exception\CurlException;
 class Curl
 {
 
-    public const VERSION = '0.2';
+    public const VERSION = '0.3';
 
     protected ?string $url = null;
 
@@ -48,11 +48,7 @@ class Curl
 
     protected array $params = [];
 
-    protected array $response = [
-        'status'    => 200,
-        'headers'    => [],
-        'body'      => ''
-    ];
+    protected array $response = [];
 
     /** @var mixed */
     protected $info = null;
@@ -149,9 +145,26 @@ class Curl
         return $this;
     }
 
-    public function getResponse(): array
+    /**
+     * @param string|null $case <p>
+     * "status"     (string)    : If any, response status header line
+     * "headers"    (array)     : Array holding the headers of the response.
+     * "body"       (string)    : Response body
+     * "code"       (int)       : Response status code
+     * "version"    (string)    : Response HTTP version
+     * </p>
+     * @return null|int|string|array
+     */
+    public function getResponse(?string $case = null)
     {
-        return $this->response;
+        if(empty($this->response)){
+            return null;
+        }
+        if($case === null){
+            return $this->response;
+        }
+        $case = \strtolower($case);
+        return $this->response[$case] ?? null;
     }
 
     public function clear(): self
@@ -172,11 +185,7 @@ class Curl
         $this->body = '';
         $this->file = null;
         $this->fileSeek = 0;
-        $this->response = [
-            'status'    => 200,
-            'headers'    => [],
-            'body'      => ''
-        ];
+        $this->response = [];
         $this->params = [];
         $this->info = null;
         return $this;
@@ -274,8 +283,13 @@ class Curl
         $this->setOpt(\CURLOPT_HEADERFUNCTION, function ($ch, $data){
             $str = \trim($data);
             if($str !== ''){
-                if(\strpos(\strtolower($str), 'http/') === 0){
+                $lowercase = \strtolower($str);
+                if(\strpos($lowercase, 'http/') === 0){
                     $this->response['status'] = $str;
+                    if(\preg_match("/http\/([\.0-2]+) ([\d]+).?/i", $lowercase, $matches)){
+                        $this->response['version'] = $matches[1];
+                        $this->response['code'] = (int)$matches[2];
+                    }
                 }else{
                     $this->response['headers'][] = $str;
                 }

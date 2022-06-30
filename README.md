@@ -28,7 +28,7 @@ $curl->init('https:://www.muhammetsafak.com.tr');
 $curl->exec();
 $curl->close();
 
-$content = ($curl->getResponse())['body'];
+$content = ($curl->getResponse('body'));
 $curl->clear();
 echo $content;
 ```
@@ -59,6 +59,18 @@ $curl->clear();
  * @var string $status
  */
 $status = $res['status'];
+
+/**
+ * Response HTTP Status Code
+ * @var int $code
+ */
+$code = $res['code'];
+
+/**
+ * Response HTTP Version Status
+ * @var string $version
+ */
+$version = $res['version'];
 
 /**
  * HTTP Response Headers
@@ -156,14 +168,16 @@ public function setParams(array $params = []): self
 Returns an array containing the response information.
 
 ```php
-public function getResponse(): array
+public function getResponse(null|string $case = null): null|array|string|int
 ```
 
-The array to return is as follows.
+The array to return is as follows. The following array keys can be used for the `$case` parameter.
 
 ```php
 array(
     'status'    => 'HTTP/1.1 200 OK',
+    'code'      => 200,
+    'version'   => '1.1',
     'headers'    => [
         'Content-Type: application/json',
         // ...
