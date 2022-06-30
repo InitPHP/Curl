@@ -36,6 +36,7 @@ class Curl
         'allow_redirects'   => false,
         'max_redirects'     => 3,
         'timeout'           => 0,
+        'timeout_ms'        => 0,
         'ssl'               => true,
         'proxy'             => null,
     ];
@@ -201,6 +202,7 @@ class Curl
             'allow_redirects'   => false,
             'max_redirects'     => 5,
             'timeout'           => 0,
+            'timeout_ms'        => 0,
             'ssl'               => true,
             'proxy'             => null,
         ];
@@ -240,6 +242,8 @@ class Curl
         $this->setOpt(\CURLOPT_SSL_VERIFYHOST, (($this->options['ssl'] ?? false) ? 2 : 0));
         if(($timeout = ($this->options['timeout'] ?? 0)) > 0){
             $this->setOpt(\CURLOPT_TIMEOUT, $timeout);
+        }elseif(($timeout_ms = ($this->options['timeout_ms'] ?? 0)) > 0){
+            $this->setOpt(\CURLOPT_TIMEOUT_MS, $timeout_ms);
         }
 
         $options = [
