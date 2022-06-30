@@ -41,6 +41,8 @@ class Curl
         'proxy'             => null,
     ];
 
+    protected ?string $userAgent = null;
+
     protected string $body = '';
 
     protected ?string $file = null;
@@ -148,6 +150,12 @@ class Curl
         return $this;
     }
 
+    public function setUserAgent(?string $userAgent = null): self
+    {
+        $this->userAgent = $userAgent;
+        return $this;
+    }
+
     /**
      * @param string|null $case <p>
      * "status"     (string)    : If any, response status header line
@@ -251,6 +259,9 @@ class Curl
             \CURLOPT_URL            => $this->url,
             \CURLOPT_HTTPHEADER     => $this->getHeaders(),
         ];
+        if(!empty($this->userAgent)){
+            $options[\CURLOPT_USERAGENT] = $this->userAgent;
+        }
 
         switch($this->protocol){
             case '1.0':
@@ -365,7 +376,7 @@ class Curl
     public function setOpt($key, $value): self
     {
         if(!isset($this->curl)){
-            throw new CurlException('The Curl::setOpt() method can be used after the init() method and before the exec() method.');
+            throw new CurlException('The Curl::setOpt() method can be used after the Curl::init() method and before the Curl::exec() method.');
         }
         \curl_setopt($this->curl, $key, $value);
         return $this;
@@ -373,17 +384,17 @@ class Curl
 
     protected function getHeaders(): array
     {
-        $reheaders = [];
+        $headers = [];
         foreach ($this->headers as $key => $values){
             if(!\is_array($values)){
-                $reheaders[] = \sprintf('%s: %s', $key, $values);
+                $headers[] = \sprintf('%s: %s', $key, $values);
             }else{
                 foreach($values as $value){
-                    $reheaders[] = \sprintf('%s: %s', $key, $value);
+                    $headers[] = \sprintf('%s: %s', $key, $value);
                 }
             }
         }
-        return $reheaders;
+        return $headers;
     }
 
     protected function readUpload(int $length): string

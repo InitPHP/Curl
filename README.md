@@ -151,6 +151,7 @@ The elements of the array of options are described below.
 - `allow_redirects` : Boolean. If the destination URL is redirecting; Defines whether the redirect is to be followed. Its default value is `false`.
 - `max_redirects` : Integer. If URL redirects are to be followed, it defines the maximum number of redirects to follow. Its default value is `3`.
 - `timeout` : Integer. Maximum seconds to wait for URL to respond. A number of 0 or less means there is no limit. Its default value is `0`.
+- `timeout_ms` : Integer. Maximum microseconds to wait for URL to respond. A number of 0 or less means there is no limit. Its default value is `0`. It is not used if it is defined in seconds with "`timeout`".
 - `ssl` : Boolean. Defines whether the request will be made over SSL. Its default value is `true`.
 - `proxy` : Defines the proxy to use. Its default value is `null`
 
@@ -160,6 +161,14 @@ Adds parameters.
 
 ```php
 public function setParams(array $params = []): self
+```
+
+### `setUserAgent()`
+
+Defines the `\CURLOPT_USERAGENT` information for curl.
+
+```php
+public function setUserAgent(null|string $userAgent = null): self;
 ```
 
 ### `getResponse()`
