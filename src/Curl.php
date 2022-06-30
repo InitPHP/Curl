@@ -43,6 +43,8 @@ class Curl
 
     protected ?string $userAgent = null;
 
+    protected ?string $referer = null;
+
     protected string $body = '';
 
     protected ?string $file = null;
@@ -156,6 +158,12 @@ class Curl
         return $this;
     }
 
+    public function setReferer(?string $referer = null): self
+    {
+        $this->referer = $referer;
+        return $this;
+    }
+
     /**
      * @param string|null $case <p>
      * "status"     (string)    : If any, response status header line
@@ -220,6 +228,8 @@ class Curl
         $this->response = [];
         $this->params = [];
         $this->getInfo = [];
+        $this->userAgent = null;
+        $this->referer = null;
         return $this;
     }
 
@@ -261,6 +271,9 @@ class Curl
         ];
         if(!empty($this->userAgent)){
             $options[\CURLOPT_USERAGENT] = $this->userAgent;
+        }
+        if(!empty($this->referer)){
+            $options[\CURLOPT_REFERER] = $this->referer;
         }
 
         switch($this->protocol){

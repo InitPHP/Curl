@@ -171,6 +171,14 @@ Defines the `\CURLOPT_USERAGENT` information for curl.
 public function setUserAgent(null|string $userAgent = null): self;
 ```
 
+### `setReferer()`
+
+Defines the `\CURLOPT_REFERER` information for curl.
+
+```php
+public function setReferer(null|string $referer = null): self;
+```
+
 ### `getResponse()`
 
 Returns an array containing the response information.
