@@ -70,6 +70,9 @@ class Curl
     /** @var null|resource|false */
     protected $curl = null;
 
+    /** @var null|bool|string */
+    protected $exec = null;
+
     public function __construct()
     {
         if(!\extension_loaded('curl')){
@@ -242,6 +245,19 @@ class Curl
     }
 
     /**
+     * @param string $filePath
+     * @return false|int
+     */
+    public function save(string $filePath)
+    {
+        $content = $this->getResponse('body');
+        if (empty($content)) {
+            return false;
+        }
+        return @\file_put_contents($filePath, $content);
+    }
+
+    /**
      * @param int|string $key
      * @param mixed $value
      * @return $this
@@ -271,7 +287,7 @@ class Curl
             if(!empty($this->options)){
                 \curl_setopt_array($this->curl, $this->options);
             }
-            $res = \curl_exec($this->curl);
+            $this->exec = \curl_exec($this->curl);
             $this->getInfo = \curl_getinfo($this->curl);
             $this->error = \curl_error($this->curl);
         }catch (\Exception $e) {
@@ -285,10 +301,10 @@ class Curl
             ]);
             \curl_reset($this->curl);
             \curl_close($this->curl);
+            $this->curl = null;
         }
-        return $res !== FALSE;
+        return !empty($this->exec);
     }
-
 
     private function curlOptionsPrepare(): void
     {
@@ -297,8 +313,8 @@ class Curl
                 ->addCurlOption(\CURLOPT_REDIR_PROTOCOLS, (\CURLPROTO_HTTP | \CURLPROTO_HTTPS));
         }
         $this->addCurlOption(\CURLOPT_HEADER, false)
-            ->addCurlOption(\CURLOPT_RETURNTRANSFER, false)
             ->addCurlOption(\CURLOPT_FAILONERROR, false);
+        $this->addCurlOption(\CURLOPT_RETURNTRANSFER, false);
 
         $canFollow = $this->canFollow && $this->allowRedirects;
         $this->addCurlOption(\CURLOPT_FOLLOWLOCATION, $canFollow)

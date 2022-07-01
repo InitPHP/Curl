@@ -311,6 +311,30 @@ cURL starts and executes.
 public function handler(): bool
 ```
 
+### `save()`
+
+After cURL is handled, it writes the content to the specified file.
+
+```php
+public function save(string $filePath): false|int
+```
+
+Returns the number of bytes written on success.
+
+**Example :**
+
+```php
+/** @var \InitPHP\Curl\Curl $curl */
+$curl = new \InitPHP\Curl\Curl();
+$curl->setUrl("http://example.com")
+        ->prepare()
+        ->handler();
+        
+if($curl->save(__DIR__ . '/example.html') === FALSE){
+    echo "The file could not be written.";
+}
+```
+
 ## Credits
 
 - [Muhammet ŞAFAK](https://www.muhammetsafak.com.tr) <<info@muhammetsafak.com.tr>>
