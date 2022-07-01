@@ -46,6 +46,8 @@ class Curl
 
     protected array $fields = [];
 
+    protected array $cookies = [];
+
     protected bool $canFollow = false;
 
     protected bool $allowRedirects = false;
@@ -86,6 +88,33 @@ class Curl
         return [
             'url'   => $this->url
         ];
+    }
+
+    public static function client(string $method, string $url): Curl
+    {
+        $client = new self();
+        $client->setMethod($method)
+            ->setUrl($url);
+        return $client;
+    }
+
+    public static function get(string $method, string $url, array $headers = [], ?string $body = null, string $version = '1.1'): array
+    {
+        $curl = self::client($method, $url)
+                    ->setVersion($version);
+        if(!empty($headers)){
+            $curl->setHeaders($headers);
+        }
+        if(!empty($body)){
+            $curl->setBody($body);
+        }
+        if(!$curl->handler()){
+            return [
+                'error'     => (!empty($curl->getError()) ? $curl->getError() : 'Something went wrong.'),
+                'info'      => $curl->getInfo()
+            ];
+        }
+        return $curl->getResponse();
     }
 
     public function setUrl(string $url): self
@@ -213,6 +242,40 @@ class Curl
     }
 
     /**
+     * @param string $name
+     * @param string|int|float $value
+     * @return $this
+     */
+    public function setCookie(string $name, $value): self
+    {
+        if(!\is_string($value) && !\is_numeric($value)){
+            throw new \InvalidArgumentException("Defined '" . $name . "' cookie value can only be string or numeric.");
+        }
+        $name = \trim($name);
+        $value = \trim((string)$value);
+        $this->cookies[$name] = $value;
+        return $this;
+    }
+
+    public function setCookies(array $cookies): self
+    {
+        foreach ($cookies as $key => $value) {
+            $this->setCookie((string)$key, $value);
+        }
+        return $this;
+    }
+
+    public function setCookieJarFile(string $filePath): self
+    {
+        if(!\is_file($filePath)){
+            $this->addCurlOption(\CURLOPT_COOKIEJAR, $filePath);
+        }else{
+            $this->addCurlOption(\CURLOPT_COOKIEFILE, $filePath);
+        }
+        return $this;
+    }
+
+    /**
      * @param null|string $key
      * @return null|mixed
      */
@@ -274,14 +337,9 @@ class Curl
         return $this;
     }
 
-    public function prepare(): self
-    {
-        $this->curlOptionsPrepare();
-        return $this;
-    }
-
     public function handler(): bool
     {
+        $this->curlOptionsPrepare();
         $this->curl = \curl_init();
         try {
             if(!empty($this->options)){
@@ -335,7 +393,13 @@ class Curl
         if(!empty($this->referer)){
             $this->addCurlOption(\CURLOPT_REFERER, $this->referer);
         }
-
+        if(!empty($this->cookies)){
+            $cookies = [];
+            foreach ($this->cookies as $key => $value) {
+                $cookies[$key] = $key . '=' . $value;
+            }
+            $this->addCurlOption(\CURLOPT_COOKIE, \implode('; ', $cookies));
+        }
         switch ($this->version) {
             case '1.0':
                 $version = \CURL_HTTP_VERSION_1_0;

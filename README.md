@@ -23,8 +23,7 @@ use \InitPHP\Curl\Curl;
 
 $curl = new Curl();
 $curl->setUrl("https://example.com");
-$curl->prepare()
-    ->handler();
+$curl->handler();
     
 $res = $this->getResponse();
 
@@ -40,17 +39,14 @@ This library can be used as HTTP client for your API service. Example:
 require_once "vendor/autoload.php";
 use \InitPHP\Curl\Curl;
 
-$curl = new Curl();
+$curl = Curl::client('PUT', 'http://api.service.example.com/update/1')
 
-$curl->setUrl("http://api.service.example.com/update/1")
-    ->setMethod("PUT") // HTTP Request METHOD
-    ->setVersion("1.1") // HTTP Version
+$curl->setVersion("1.1") // HTTP Version
     ->setHeader("Content-Type", "application/json")
     ->setBody(json_encode([
         'username'  => 'admin',
         'password'  => '12345',
     ]))
-    ->prepare()
     ->handler();
 
 if(!empty($curl->getError())){
@@ -73,6 +69,14 @@ switch ($curl->getResponse('code')) {
 ```
 
 ## Methods
+
+### `client()`
+
+Creates a new client object.
+
+```php
+public static function client(string $method, string $url): \InitPHP\Curl\Curl;
+```
 
 ### `getResponse()`
 
@@ -284,7 +288,7 @@ public function getError(): null|string
 It is the `curl_setopt()` function in this library.
 
 ```php
-public function setOpt($key, $value): self
+public function setOpt(int $key, mixed $value): self
 ```
 
 ### `setOptions()`
@@ -293,14 +297,6 @@ It is the `curl_setopt_array()` function in this library.
 
 ```php
 public function setOptions(array $options): self
-```
-
-### `prepare()`
-
-cURL prepares the library for initialization.
-
-```php
-public function prepare(): self
 ```
 
 ### `handler()`
@@ -327,12 +323,74 @@ Returns the number of bytes written on success.
 /** @var \InitPHP\Curl\Curl $curl */
 $curl = new \InitPHP\Curl\Curl();
 $curl->setUrl("http://example.com")
-        ->prepare()
         ->handler();
         
 if($curl->save(__DIR__ . '/example.html') === FALSE){
     echo "The file could not be written.";
 }
+```
+
+### `setCookie()`
+
+Defines a cookie to be sent with cURL.
+
+```php
+public function setCookie(string $name, string|int|float $value): self
+```
+
+**Example :**
+
+```php
+/** @var \InitPHP\Curl\Curl $curl */
+$curl->setCookie('username', 'admin') // $_COOKIE['username']
+    ->setCookie('mail', 'admin@example.com'); // $_COOKIE['mail']
+```
+
+### `setCookies()`
+
+Defines cookies as multiple with an associative array.
+
+```php
+public function setCookies(array $cookies): self
+```
+
+**Example :**
+
+```php
+/** @var \InitPHP\Curl\Curl $curl */
+$curl->setCookies([
+    'username'  => 'admin', // $_COOKIE['username']
+    'mail'      => 'admin@example.com' // $_COOKIE['mail']
+]);
+```
+
+### `setCookieJarFile()`
+
+It tells the file path where the cookies values to be sent to the server will be kept or kept.
+
+```php
+public function setCookieJarFile(string $filePath): self
+```
+
+If the specified file exists, cookies are read from the file and sent to the server. `CURLOPT_COOKIEFILE`
+
+If the specified file does not exist, cookies from the server are written to the file. `CURLOPT_COOKIEJAR`
+
+**Example :**
+
+```php
+$login = new \InitPHP\Curl\Curl();
+$login->setUrl("http://example.com/user/login")
+    ->setField('username', 'admin')
+    ->setField('password', '123456')
+    ->setMethod('POST')
+    ->setCookieJarFile(__DIR__ . '/session.txt')
+    ->handler();
+    
+$dashboard = new \InitPHP\Curl\Curl();
+$dashboard->setUrl("http://example.com/user/dashboard")
+    ->setCookieJarFile(__DIR__ . '/session.txt')
+    ->handler();
 ```
 
 ## Credits
